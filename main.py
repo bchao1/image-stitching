@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 from lib.features.detection import harris_corner_detection, plot_detection
 from lib.features.matching import least_error_ratio_match, get_matching_pairs
 from lib.utils import read_image
+from projection import project, FET
+from skimage import io
+import sys
 
 def get_features(img_dir, r_threshold = 1e7, max_features = 500, window = 20):
     img_files = sorted(os.listdir(img_dir))
@@ -64,4 +67,23 @@ if __name__ == '__main__':
     y = np.load('cache/y.npy').astype(np.int)
     features = np.load('cache/features.npy')
     # get matching coodinates for images 0, 1
+    print(x.shape)
+    print(features.shape)
     pairs = get_matching_pairs(x, y, features, 0, 1, threshold = 0.5)
+    print(pairs.shape)
+    
+    image_dir = './images'
+    image_files = sorted(os.listdir(image_dir))
+    ratio = int(sys.argv[1])
+    imgs = []
+    for i, file in enumerate(image_files):
+        img = cv2.imread(os.path.join(image_dir, file))
+        print( os.path.join(image_dir, file))
+        h,w,_ =  img.shape
+        imgs.append( cv2.resize(img,(w//ratio, h//ratio)))
+
+    for i, img in enumerate( imgs ):
+        warped_img = project( img, 8000, ratio)
+        print(warped_img.shape)
+        imgs.append( np.flip(warped_img,2) )
+        #io.imsave('./projection/image{}.jpg'.format(i), np.flip(warped_img,2))

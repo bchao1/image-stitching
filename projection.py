@@ -1,28 +1,28 @@
 import numpy as np
-import cv2
 import os
-import sys
-import math
-from matplotlib import pyplot as plt
+import argparse
+from skimage import io, transform
+from skimage.util import crop
+import matplotlib.pyplot as plt
+from argparse import ArgumentParser
 
-def project( img, f, ratio ):
+# ===============
+# Transform
+# ===============
+
+def FET(img, f, ratio):
     h,w,_ = img.shape
-    warped_img = np.zeros( img.shape )
     f = f/ratio
-    for i in range( w ) :
-        x = np.tan((i-w//2)/f)*f
-        for j in range( h ) :
-            y = (j-h//2)/f*np.sqrt(x**2+f**2)
-            if( (x+w//2) < 1 or (x+w//2) >= w-1 ) :
-                continue
-            elif( (y+h//2) < 1 or (y+h//2) >= h-1 ) :
-                continue
-            else:
-                x_f = math.floor( x )
-                y_f = math.floor( y )
-                a = x - x_f
-                b = y - y_f
-                warped_img[j, i, : ] = (1-a)*(1-b)*img[ y_f+h//2, x_f+w//2, : ] + (1-a)*(b)*img[ y_f+1+h//2, x_f+w//2, : ] + (1-b)*(a)*img[ y_f+h//2, x_f+1+w//2, : ] + (a)*(b)*img[ y_f+1+h//2, x_f+1+w//2, : ]
-                # print(warped_img[j, i, :])
-    return warped_img
+    def callback(xy_d):
+        x_d = (xy_d[:, 0])
+        y_d = (xy_d[:, 1])
+        x_u = np.tan((x_d-w//2)/f)*f
+        y_u = (y_d-h//2)/f*np.sqrt(np.square(x_u)+f**2)
+        xy_u = np.column_stack((x_u+w//2, y_u+h//2))
+        return xy_u
 
+    out = transform.warp(img, callback, order = 5, mode = 'constant')
+    return out
+    
+def project(img, f, ratio):
+    return (FET(img, 8000, 1) * 255).astype(np.uint8)
