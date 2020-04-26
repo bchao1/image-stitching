@@ -5,9 +5,8 @@ import matplotlib.pyplot as plt
 from lib.features.detection import harris_corner_detection, plot_detection
 from lib.features.matching import least_error_ratio_match, get_matching_pairs
 from lib.utils import read_image
-from warp import project, feature_project, translate
+from warp import project, feature_project, translate, ransac
 import sys
-import random
 
 def get_features(img_dir, r_threshold = 1e7, max_features = 500, window = 20):
     img_files = sorted(os.listdir(img_dir))
@@ -62,18 +61,26 @@ def plot_matching(img_dir = 'images', cache_dir = 'cache'):
     plt.subplots_adjust(top = 1, bottom = 0, right = 0.99, left = 0.01)
     plt.show()
 
+def in_img(f, tx, ty, w, h, x_d, y_d):
+    x_d = x_d + tx
+    y_d = y_d + ty
+    x_u = np.tan((x_d-w//2)/f)*f
+    y_u = (y_d-h//2)/f*np.sqrt(np.square(x_u)+f**2)
+    return(0 <= x_u+w//2 and x_u+w//2 <= w and 0 <= y_u+h//2 and y_u+h//2 <= h)
+
+
 if __name__ == '__main__':
     x = np.load('cache/x.npy').astype(np.int)
     y = np.load('cache/y.npy').astype(np.int)
     features = np.load('cache/features.npy')
     # get matching coodinates for images 0, 1
-    pairs = get_matching_pairs(x, y, features, 2, 3, threshold = 0.5)
+    pairs = get_matching_pairs(x, y, features, 3, 4, threshold = 0.5)
     f = int(sys.argv[2])
-    image_dir = './images'
+    image_dir = './images/library'
     # image_files = sorted(os.listdir(image_dir))
-    image_files = ['3.JPG', '4.JPG']
+    image_files = ['IMG_6583.JPG', 'IMG_6584.JPG']
     ratio = int(sys.argv[1])
-    pairs = feature_project(pairs, f, ratio )
+    f = f/ratio
     imgs = []
     warped_imgs = []
     for i, file in enumerate(image_files):
@@ -82,48 +89,37 @@ if __name__ == '__main__':
         imgs.append( cv2.resize(img,(w//ratio, h//ratio)))
 
     for i, img in enumerate(imgs):
-        warped_img = project( img, f, ratio)
+        warped_img = project( img, f )
         warped_imgs.append(warped_img)
-    k = 100
-    threshold = 10
-    max_vote_num = 0
-    final_tx = 0
-    final_ty = 0
-    for _ in range(k):
-        rand = random.randint(0, len(pairs)-1)
-        (x2, y2), (x1, y1) = pairs[rand]
-        tx = x1 - x2
-        ty = y1 - y2
-        vote_num = 0
-        for _p in pairs:
-            (x2, y2), (x1, y1) = _p
-            _tx = x1 - x2
-            _ty = y1 - y2
-            dis = np.sqrt((tx-_tx)**2+(ty-_ty)**2)
-            vote_num += (dis <= threshold)
-        if vote_num > max_vote_num:
-            max_vote_num = vote_num
-            final_tx = tx
-            final_ty = ty
-    print(final_tx, final_ty, max_vote_num/len(pairs))
-    warped = []
-    warped = translate(warped_imgs[1], (final_tx, final_ty))
-    warped_imgs[1] = warped
-    if final_ty > 0:
-        warped = translate(warped_imgs[0], (0,-final_ty))
-        warped_imgs[0] = warped
-    cv2.imwrite('0.jpg', warped_imgs[0])
-    cv2.imwrite('1.jpg', warped_imgs[1])
 
-    h, w, _ = warped_imgs[0].shape
-    for i in range(h):
-        for j in range(w):
-            if (warped_imgs[1][i,j] == [0,0,0]).all():
-                warped_imgs[1][i,j] = warped_imgs[0][i,j]
-            else:
-                warped_imgs[1][i,j] = warped_imgs[1][i,j]/2 + warped_imgs[0][i,j]/2
+    h, w, _ = imgs[0].shape
+    warped_pairs = feature_project(pairs, f, h, w)
+    tx0, ty0 = ransac(warped_pairs, k=100, threshold=3 )
+    tx1 = 0
+    ty1 = 0
+    if( ty0 > 0 ):
+        ty1 = -ty0
+        ty0 = 0
+    warped = translate(warped_imgs[0], (tx0, ty1))
+    warped_imgs[0] = warped
+    warped = translate(warped_imgs[1], (0, ty1))
+    warped_imgs[1] = warped
+
+    h, w, _ = warped_imgs[1].shape
+    for j in range(h):
+        for i in range(w):
+            if in_img( f, tx0, ty0, w, h, i, j) and in_img( f, tx1, ty1, w, h, i, j):
+                boundary_width = 2*np.tan(w//2/f)*f
+                blank_width = (w-boundary_width)/2
+                boundary = w-blank_width
+                boundary_dis1 = boundary - i
+                ratio1 = boundary_dis1/(boundary_width-tx0)
+                ratio0 = 1-ratio1
+                warped_imgs[0][j,i] = warped_imgs[0][j,i]*ratio1 + warped_imgs[1][j,i]*ratio0
+            elif in_img( f, tx1, ty1, w, h, i, j):
+                warped_imgs[0][j,i] = warped_imgs[1][j,i]
     
-    cv2.imwrite('test.jpg', warped_imgs[1])
+    cv2.imwrite('test.jpg', warped_imgs[0])
 
 
 
