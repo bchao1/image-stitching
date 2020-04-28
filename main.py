@@ -8,8 +8,17 @@ from lib.utils import read_image
 from warp import project, feature_project, translate, ransac
 import sys
 
-def get_features(run, r_threshold = 1e7, max_features = 500, window = 20):
+def get_features(run, downscale = 4, r_threshold = 1e7, max_features = 500, window = 20):
     img_dir = os.path.join('runs', run, 'images')
+    detection_dir = os.path.join('runs', run, 'detection')
+    if not os.path.exists(detection_dir):
+        os.mkdir(detection_dir)
+    else:
+        x_coors = np.load(os.path.join(detection_dir, 'x.npy'))
+        y_coors = np.load(os.path.join(detection_dir, 'y.npy'))
+        features = np.load(os.path.join(detection_dir, 'features.npy'))
+        return x_coors, y_coors, features
+    
     img_files = sorted(os.listdir(img_dir))
     img_paths = [os.path.join(img_dir, f) for f in img_files]
 
@@ -19,15 +28,11 @@ def get_features(run, r_threshold = 1e7, max_features = 500, window = 20):
 
     for i, img in enumerate(img_paths):
         print("Detecting {} features ...".format(img))
-        x, y, _, f = harris_corner_detection(img, 4, r_threshold = r_threshold,
+        x, y, _, f = harris_corner_detection(img, downscale, r_threshold = r_threshold,
             max_features = max_features, window = window)
         x_coors[i] = x
         y_coors[i] = y 
         features[i] = f
-
-    detection_dir = os.path.join('runs', run, 'detection')
-    if not os.path.exists(detection_dir):
-        os.mkdir(detection_dir)
     np.save(os.path.join(detection_dir, 'x.npy'), x_coors)
     np.save(os.path.join(detection_dir, 'y.npy'), y_coors)
     np.save(os.path.join(detection_dir, 'features.npy'), features)
@@ -77,17 +82,16 @@ def in_img(f, tx, ty, w, h, x_d, y_d):
 
 if __name__ == '__main__':
     run = 'library'
-    get_features(run)
-    plot_matching(run)
-    '''
-    # get matching coodinates for images 0, 1
+    image_dir = os.path.join('runs', run, 'images')
+    x, y, features = get_features(run)
+    #plot_matching(run)
     pairs = get_matching_pairs(x, y, features, 3, 4, threshold = 0.5)
-    f = int(sys.argv[2])
-    image_dir = './images/library'
-    # image_files = sorted(os.listdir(image_dir))
-    image_files = ['IMG_6584.JPG', 'IMG_6583.JPG']
+    image_files = sorted(os.listdir(image_dir))
+
     ratio = int(sys.argv[1])
-    f = f/ratio
+    f = int(sys.argv[2])
+
+    f = f / ratio
     imgs = []
     warped_imgs = []
     for i, file in enumerate(image_files):
@@ -128,11 +132,4 @@ if __name__ == '__main__':
                 # print(ratio0)
             elif in_img( f, tx0, ty0, w, h, i, j):
                 warped_imgs[1][j,i] = warped_imgs[0][j,i]
-
-
-
-
-
-    
-
 
