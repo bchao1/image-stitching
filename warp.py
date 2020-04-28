@@ -34,9 +34,9 @@ def FET_t(img, tx, ty):
     def callback(xy_d):
         x_d = (xy_d[:, 0])
         y_d = (xy_d[:, 1])
-        x_u = x_d + tx
-        if ty <= 0:
-            y_u = y_d + ty
+        x_u = x_d - tx
+        if ty >= 0:
+            y_u = y_d - ty
         else :
             y_u = y_d
         xy_u = np.column_stack((x_u, y_u))

@@ -62,8 +62,8 @@ def plot_matching(img_dir = 'images', cache_dir = 'cache'):
     plt.show()
 
 def in_img(f, tx, ty, w, h, x_d, y_d):
-    x_d = x_d + tx
-    y_d = y_d + ty
+    x_d = x_d - tx
+    y_d = y_d - ty
     x_u = np.tan((x_d-w//2)/f)*f
     y_u = (y_d-h//2)/f*np.sqrt(np.square(x_u)+f**2)
     return(0 <= x_u+w//2 and x_u+w//2 <= w and 0 <= y_u+h//2 and y_u+h//2 <= h)
@@ -73,12 +73,12 @@ if __name__ == '__main__':
     x = np.load('cache/x.npy').astype(np.int)
     y = np.load('cache/y.npy').astype(np.int)
     features = np.load('cache/features.npy')
-    # get matching coodinates for images 0, 1
-    pairs = get_matching_pairs(x, y, features, 3, 4, threshold = 0.5)
+    # get matching coodinates for images 4, 3
+    pairs = get_matching_pairs(x, y, features, 4, 3, threshold = 0.5)
     f = int(sys.argv[2])
     image_dir = './images/library'
     # image_files = sorted(os.listdir(image_dir))
-    image_files = ['IMG_6583.JPG', 'IMG_6584.JPG']
+    image_files = ['IMG_6584.JPG', 'IMG_6583.JPG']
     ratio = int(sys.argv[1])
     f = f/ratio
     imgs = []
@@ -94,32 +94,35 @@ if __name__ == '__main__':
 
     h, w, _ = imgs[0].shape
     warped_pairs = feature_project(pairs, f, h, w)
-    tx0, ty0 = ransac(warped_pairs, k=100, threshold=3 )
-    tx1 = 0
-    ty1 = 0
-    if( ty0 > 0 ):
-        ty1 = -ty0
-        ty0 = 0
-    warped = translate(warped_imgs[0], (tx0, ty1))
+    tx1, ty1 = ransac(warped_pairs, k=100, threshold=3 )
+    tx0 = 0
+    ty0 = 0
+    if( ty1 < 0 ):
+        ty0 = -ty1
+        ty1 = 0
+    warped = translate(warped_imgs[0], (0, ty0))
     warped_imgs[0] = warped
-    warped = translate(warped_imgs[1], (0, ty1))
+    warped = translate(warped_imgs[1], (tx1, ty0))#後面是圖片要增加多少邊長，所以兩張圖片的y方向都要增加一樣的邊長
     warped_imgs[1] = warped
 
-    h, w, _ = warped_imgs[1].shape
+    # cv2.imwrite('0.jpg', warped_imgs[0])
+    # cv2.imwrite('1.jpg', warped_imgs[1])
+    h, w, _ = warped_imgs[0].shape
     for j in range(h):
         for i in range(w):
             if in_img( f, tx0, ty0, w, h, i, j) and in_img( f, tx1, ty1, w, h, i, j):
                 boundary_width = 2*np.tan(w//2/f)*f
                 blank_width = (w-boundary_width)/2
                 boundary = w-blank_width
-                boundary_dis1 = boundary - i
-                ratio1 = boundary_dis1/(boundary_width-tx0)
-                ratio0 = 1-ratio1
-                warped_imgs[0][j,i] = warped_imgs[0][j,i]*ratio1 + warped_imgs[1][j,i]*ratio0
-            elif in_img( f, tx1, ty1, w, h, i, j):
-                warped_imgs[0][j,i] = warped_imgs[1][j,i]
+                boundary_dis0 = boundary - i
+                ratio0 = boundary_dis0/(boundary_width-tx1)
+                ratio1 = 1-ratio0
+                warped_imgs[1][j,i] = warped_imgs[0][j,i]*ratio0 + warped_imgs[1][j,i]*ratio1
+                # print(ratio0)
+            elif in_img( f, tx0, ty0, w, h, i, j):
+                warped_imgs[1][j,i] = warped_imgs[0][j,i]
     
-    cv2.imwrite('test.jpg', warped_imgs[0])
+    cv2.imwrite('test.jpg', warped_imgs[1])
 
 
 
