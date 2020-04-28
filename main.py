@@ -70,9 +70,8 @@ def in_img(f, tx, ty, w, h, x_d, y_d):
 
 
 if __name__ == '__main__':
-    x = np.load('cache/x.npy').astype(np.int)
-    y = np.load('cache/y.npy').astype(np.int)
-    features = np.load('cache/features.npy')
+    get_features()
+    plot_matching('images/library')
     # get matching coodinates for images 4, 3
     pairs = get_matching_pairs(x, y, features, 4, 3, threshold = 0.5)
     f = int(sys.argv[2])
@@ -122,7 +121,7 @@ if __name__ == '__main__':
             elif in_img( f, tx0, ty0, w, h, i, j):
                 warped_imgs[1][j,i] = warped_imgs[0][j,i]
     
-    cv2.imwrite('test.jpg', warped_imgs[1])
+    cv2.imwrite('haha.jpg', warped_imgs[1])
 
 
 
