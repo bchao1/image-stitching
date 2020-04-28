@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from argparse import ArgumentParser
 import math
 import random
+import cv2
 
 # ===============
 # Transform
@@ -91,3 +92,6 @@ def ransac(pairs, k = 100, threshold = 5):
             final_ty = ty_sum/vote_num
     print(final_tx, final_ty, max_vote_num/len(pairs))
     return final_tx, final_ty
+
+if __name__ == '__main__':
+    img = cv2.imread('../images/')

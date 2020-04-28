@@ -8,7 +8,8 @@ from lib.utils import read_image
 from warp import project, feature_project, translate, ransac
 import sys
 
-def get_features(img_dir, r_threshold = 1e7, max_features = 500, window = 20):
+def get_features(run, r_threshold = 1e7, max_features = 500, window = 20):
+    img_dir = os.path.join('runs', run, 'images')
     img_files = sorted(os.listdir(img_dir))
     img_paths = [os.path.join(img_dir, f) for f in img_files]
 
@@ -23,22 +24,27 @@ def get_features(img_dir, r_threshold = 1e7, max_features = 500, window = 20):
         x_coors[i] = x
         y_coors[i] = y 
         features[i] = f
-    np.save('x.npy', x_coors)
-    np.save('y.npy', y_coors)
-    np.save('features.npy', features)
+
+    detection_dir = os.path.join('runs', run, 'detection')
+    if not os.path.exists(detection_dir):
+        os.mkdir(detection_dir)
+    np.save(os.path.join(detection_dir, 'x.npy'), x_coors)
+    np.save(os.path.join(detection_dir, 'y.npy'), y_coors)
+    np.save(os.path.join(detection_dir, 'features.npy'), features)
     return x_coors, y_coors, features
 
 def test(img_path):
     x, y, r, f = harris_corner_detection(img_path, 4, r_threshold = 1e7, max_features = 100, window = 3)
     plot_detection(x, y, img_path, r)
 
-def plot_matching(img_dir = 'images', cache_dir = 'cache'):
+def plot_matching(run):
+    img_dir = os.path.join('runs', run, 'images')
     img_files = sorted(os.listdir(img_dir))
     img_paths = [os.path.join(img_dir, f) for f in img_files]
-    # npz
-    x_coors = np.load(os.path.join(cache_dir, 'x.npy'))
-    y_coors = np.load(os.path.join(cache_dir, 'y.npy'))
-    features = np.load(os.path.join(cache_dir, 'features.npy'))
+    detection_dir = os.path.join('runs', run, 'detection')
+    x_coors = np.load(os.path.join(detection_dir, 'x.npy'))
+    y_coors = np.load(os.path.join(detection_dir, 'y.npy'))
+    features = np.load(os.path.join(detection_dir, 'features.npy'))
 
     f, ax = plt.subplots(1, len(img_files))
     for i, img_path in enumerate(img_paths):
@@ -70,9 +76,10 @@ def in_img(f, tx, ty, w, h, x_d, y_d):
 
 
 if __name__ == '__main__':
-    x = np.load('cache/x.npy').astype(np.int)
-    y = np.load('cache/y.npy').astype(np.int)
-    features = np.load('cache/features.npy')
+    run = 'library'
+    get_features(run)
+    plot_matching(run)
+    '''
     # get matching coodinates for images 0, 1
     pairs = get_matching_pairs(x, y, features, 3, 4, threshold = 0.5)
     f = int(sys.argv[2])
@@ -119,7 +126,8 @@ if __name__ == '__main__':
             elif in_img( f, tx1, ty1, w, h, i, j):
                 warped_imgs[0][j,i] = warped_imgs[1][j,i]
     
-    cv2.imwrite('test.jpg', warped_imgs[0])
+    cv2.imwrite('haha.jpg', warped_imgs[0])
+    '''
 
 
 
