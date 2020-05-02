@@ -16,11 +16,12 @@ import cv2
 def FET_p(img, f):
     h,w,_ = img.shape
     def callback(xy_d):
-        x_d = (xy_d[:, 0])
-        y_d = (xy_d[:, 1])
-        x_u = np.tan((x_d-w//2)/f)*f
-        y_u = (y_d-h//2)/f*np.sqrt(np.square(x_u)+f**2)
-        xy_u = np.column_stack((x_u+w//2, y_u+h//2))
+        x_d = (xy_d[:, 0]) - w // 2
+        y_d = (xy_d[:, 1]) - h // 2
+
+        x_u = np.tan(x_d / f) * f
+        y_u = y_d * np.sqrt(x_d**2 + f**2) / f
+        xy_u = np.column_stack((x_u + w // 2, y_u + h // 2))
         return xy_u
 
     out = transform.warp(img, callback, order = 1, mode = 'constant')

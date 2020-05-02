@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from skimage.transform import rescale
 from lib.features.detection import harris_corner_detection, plot_detection
 from lib.features.matching import least_error_ratio_match, get_matching_pairs
 from lib.utils import read_image
@@ -38,8 +39,8 @@ def get_features(run, downscale = 4, r_threshold = 1e7, max_features = 500, wind
     np.save(os.path.join(detection_dir, 'features.npy'), features)
     return x_coors, y_coors, features
 
-def test(img_path):
-    x, y, r, f = harris_corner_detection(img_path, 4, r_threshold = 1e7, max_features = 100, window = 3)
+def test(img_path, downscale = 4):
+    x, y, r, f = harris_corner_detection(img_path, downscale, r_threshold = 1e7, max_features = 100, window = 3)
     plot_detection(x, y, img_path, r)
 
 def plot_matching(run):
@@ -81,44 +82,58 @@ def in_img(f, tx, ty, w, h, x_d, y_d):
 
 
 if __name__ == '__main__':
-    run = 'library'
-    image_dir = os.path.join('runs', run, 'images')
-    x, y, features = get_features(run)
-    #plot_matching(run)
-    pairs = get_matching_pairs(x, y, features, 3, 4, threshold = 0.5)
-    image_files = sorted(os.listdir(image_dir))
-
     ratio = int(sys.argv[1])
     f = int(sys.argv[2])
 
-    f = f / ratio
-    imgs = []
-    warped_imgs = []
-    for i, file in enumerate(image_files):
-        img = cv2.imread(os.path.join(image_dir, file))
-        h,w,_ =  img.shape
-        imgs.append( cv2.resize(img,(w//ratio, h//ratio)))
+    f /= ratio
 
-    for i, img in enumerate(imgs):
-        warped_img = project( img, f )
-        warped_imgs.append(warped_img)
+    run = 'library'
+    image_dir = os.path.join('runs', run, 'images')
+    warped_dir = os.path.join('runs', run, 'warped')
+    if not os.path.exists(warped_dir):
+        os.mkdir(warped_dir)
+
+    image_files = sorted(os.listdir(image_dir))
+    image_paths = [os.path.join(image_dir, f) for f in image_files]
+    imgs = [rescale(cv2.imread(impath), 1.0 / ratio, multichannel = True) for impath in image_paths]
+    warped_imgs = [project(img, f) for img in imgs]
+    
+    x, y, features = get_features(run)
+    
+    stitch_idx = 7
+    pairs = get_matching_pairs(x, y, features, stitch_idx, stitch_idx + 1, threshold = 0.4)
+
 
     h, w, _ = imgs[0].shape
     warped_pairs = feature_project(pairs, f, h, w)
-    tx1, ty1 = ransac(warped_pairs, k=100, threshold=3 )
+    tx1, ty1 = ransac(warped_pairs, k = 100, threshold = 3)
     tx0 = 0
     ty0 = 0
     if( ty1 < 0 ):
         ty0 = -ty1
         ty1 = 0
-    warped = translate(warped_imgs[0], (0, ty0))
-    warped_imgs[0] = warped
-    warped = translate(warped_imgs[1], (tx1, ty0))#後面是圖片要增加多少邊長，所以兩張圖片的y方向都要增加一樣的邊長
-    warped_imgs[1] = warped
+    warped1 = translate(warped_imgs[stitch_idx], (0, ty0))
+    warped2 = translate(warped_imgs[stitch_idx+1], (tx1, ty0)) #後面是圖片要增加多少邊長，所以兩張圖片的y方向都要增加一樣的邊長
+    cv2.imwrite('warped1.jpg', warped1)
+    cv2.imwrite('warped2.jpg', warped2)
 
-    # cv2.imwrite('0.jpg', warped_imgs[0])
-    # cv2.imwrite('1.jpg', warped_imgs[1])
-    h, w, _ = warped_imgs[0].shape
+    h1, w1, _ = warped1.shape
+    h2, w2, _ = warped2.shape
+    assert(h1 == h2)
+    tx1 = int(tx1)
+    stitched_img = np.zeros((h1, w2, 3), dtype = np.float)
+    print(w1, w2, tx1, warped_imgs[stitch_idx+1].shape[1])
+    stitched_img[:, :tx1, :] = warped1[:, :tx1, :]
+    stitched_img[:, w1:, :] = warped2[:, w1:, :]
+    ratio = np.arange(0, 1, 1.0 / (w1 - tx1))
+    ratio_map = np.repeat(ratio[np.newaxis, :], h1, axis = 0)
+    ratio_map = np.repeat(ratio_map[:, :, np.newaxis], 3, axis = 2)
+    print(ratio_map.shape)
+    print(ratio_map[:, :, 0])
+    stitched_img[:, tx1:w1, :] = (1 - ratio_map) * warped1[:, tx1:, :] + ratio_map * warped2[:, tx1:w1, :]
+
+    '''
+    h, w, _ = warped_imgs[stitch_idx].shape
     for j in range(h):
         for i in range(w):
             if in_img( f, tx0, ty0, w, h, i, j) and in_img( f, tx1, ty1, w, h, i, j):
@@ -128,8 +143,9 @@ if __name__ == '__main__':
                 boundary_dis0 = boundary - i
                 ratio0 = boundary_dis0/(boundary_width-tx1)
                 ratio1 = 1-ratio0
-                warped_imgs[1][j,i] = warped_imgs[0][j,i]*ratio0 + warped_imgs[1][j,i]*ratio1
+                warped2[j,i] = warped1[j,i]*ratio0 + warped2[j,i]*ratio1
                 # print(ratio0)
             elif in_img( f, tx0, ty0, w, h, i, j):
-                warped_imgs[1][j,i] = warped_imgs[0][j,i]
-
+                warped2[j,i] = warped1[j,i]
+    '''
+    cv2.imwrite('test{}.jpg'.format(stitch_idx), stitched_img)
