@@ -24,7 +24,7 @@ def FET_p(img, f):
         xy_u = np.column_stack((x_u + w // 2, y_u + h // 2))
         return xy_u
 
-    out = transform.warp(img, callback, order = 1, mode = 'constant')
+    out = transform.warp(img, callback, order = 1, mode = 'edge')
     return out
     
 def project(img, f):
@@ -37,14 +37,15 @@ def FET_t(img, tx, ty):
         x_d = (xy_d[:, 0])
         y_d = (xy_d[:, 1])
         x_u = x_d - tx
-        if ty >= 0:
-            y_u = y_d - ty
-        else :
-            y_u = y_d
+        y_u = y_d - ty
+        #if ty >= 0:
+        #    y_u = y_d - ty
+        #else :
+        #    y_u = y_d
         xy_u = np.column_stack((x_u, y_u))
         return xy_u
 
-    out = transform.warp(img, callback, order = 5, mode = 'constant', output_shape=(math.ceil(h+abs(ty)), math.ceil(w+abs(tx))))
+    out = transform.warp(img, callback, order = 5, mode = 'edge', output_shape=(math.ceil(h+abs(ty)), math.ceil(w+abs(tx))))
     return out
     
 def translate(img, txy):

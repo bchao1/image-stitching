@@ -8,6 +8,7 @@ from lib.features.matching import least_error_ratio_match, get_matching_pairs
 from lib.utils import read_image
 from warp import project, feature_project, translate, ransac
 import sys
+import pickle
 
 def get_features(run, downscale = 4, r_threshold = 1e8, max_features = 500, window = 20, override = False):
     img_dir = os.path.join('runs', run, 'images')
@@ -45,7 +46,8 @@ def test(img_path, downscale = 4):
 
 def plot_matching(run):
     img_dir = os.path.join('runs', run, 'images')
-    img_files = sorted(os.listdir(img_dir))
+    img_files = sorted(os.listdir(img_dir), key = lambda x: int(x.split('.')[0]))
+    print(img_files)
     img_paths = [os.path.join(img_dir, f) for f in img_files]
     detection_dir = os.path.join('runs', run, 'detection')
     x_coors = np.load(os.path.join(detection_dir, 'x.npy'))
@@ -82,9 +84,9 @@ def in_img(f, tx, ty, w, h, x_d, y_d):
 
 
 if __name__ == '__main__':
-    get_features('lib1', override = True)
-    plot_matching('lib1')
-    '''
+    #get_features('lib1', override = True)
+    #plot_matching('lib1')
+    
     ratio = int(sys.argv[1])
     f = int(sys.argv[2])
 
@@ -96,61 +98,84 @@ if __name__ == '__main__':
     if not os.path.exists(warped_dir):
         os.mkdir(warped_dir)
 
-    image_files = sorted(os.listdir(image_dir))
+    image_files = sorted(os.listdir(image_dir), key = lambda x: int(x.split('.')[0]))
+    print(image_files)
     image_paths = [os.path.join(image_dir, f) for f in image_files]
-    imgs = [rescale(cv2.imread(impath), 1.0 / ratio, multichannel = True) for impath in image_paths]
-    warped_imgs = [project(img, f) for img in imgs]
+    #imgs = [rescale(cv2.imread(impath), 1.0 / ratio, multichannel = True) for impath in image_paths]
+    #warped_imgs = [project(img, f) for img in imgs]
+    #for i, img in enumerate(warped_imgs):
+    #    cv2.imwrite(os.path.join(warped_dir, '{}.jpg'.format(i)), img)
+    warped_imgs = [cv2.imread(os.path.join(warped_dir, '{}.jpg'.format(i))) for i in range(len(image_paths))]
     
-    x, y, features = get_features(run)
+    #x, y, features = get_features(run)
     
-    stitch_idx = 7
-    pairs = get_matching_pairs(x, y, features, stitch_idx, stitch_idx + 1, threshold = 0.4)
-
-
-    h, w, _ = imgs[0].shape
-    warped_pairs = feature_project(pairs, f, h, w)
-    tx1, ty1 = ransac(warped_pairs, k = 100, threshold = 3)
-    tx0 = 0
-    ty0 = 0
-    if( ty1 < 0 ):
-        ty0 = -ty1
-        ty1 = 0
-    warped1 = translate(warped_imgs[stitch_idx], (0, ty0))
-    warped2 = translate(warped_imgs[stitch_idx+1], (tx1, ty0)) #後面是圖片要增加多少邊長，所以兩張圖片的y方向都要增加一樣的邊長
-    cv2.imwrite('warped1.jpg', warped1)
-    cv2.imwrite('warped2.jpg', warped2)
-
-    h1, w1, _ = warped1.shape
-    h2, w2, _ = warped2.shape
-    assert(h1 == h2)
-    tx1 = int(tx1)
-    stitched_img = np.zeros((h1, w2, 3), dtype = np.float)
-    print(w1, w2, tx1, warped_imgs[stitch_idx+1].shape[1])
-    stitched_img[:, :tx1, :] = warped1[:, :tx1, :]
-    stitched_img[:, w1:, :] = warped2[:, w1:, :]
-    ratio = np.arange(0, 1, 1.0 / (w1 - tx1))
-    ratio_map = np.repeat(ratio[np.newaxis, :], h1, axis = 0)
-    ratio_map = np.repeat(ratio_map[:, :, np.newaxis], 3, axis = 2)
-    print(ratio_map.shape)
-    print(ratio_map[:, :, 0])
-    stitched_img[:, tx1:w1, :] = (1 - ratio_map) * warped1[:, tx1:, :] + ratio_map * warped2[:, tx1:w1, :]
-
-
-    #h, w, _ = warped_imgs[stitch_idx].shape
-    #for j in range(h):
-    #    for i in range(w):
-    #        if in_img( f, tx0, ty0, w, h, i, j) and in_img( f, tx1, ty1, w, h, i, j):
-    #            boundary_width = 2*np.tan(w//2/f)*f
-    #            blank_width = (w-boundary_width)/2
-    #            boundary = w-blank_width
-    #            boundary_dis0 = boundary - i
-    #            ratio0 = boundary_dis0/(boundary_width-tx1)
-    #            ratio1 = 1-ratio0
-    #            warped2[j,i] = warped1[j,i]*ratio0 + warped2[j,i]*ratio1
-    #            # print(ratio0)
-    #        elif in_img( f, tx0, ty0, w, h, i, j):
-    #            warped2[j,i] = warped1[j,i]
-
-    cv2.imwrite('test{}.jpg'.format(stitch_idx), stitched_img)
-
-    '''
+    shifts = pickle.load(open('shift.pickle', 'rb'))
+    #shifts = {}
+    global_tx = global_ty = 0
+    stitched_img = warped_imgs[0] # fist image
+    for stitch_idx in range(len(image_files) - 1):
+    #stitch_idx = 4
+        print('stitching', stitch_idx, stitch_idx + 1)
+        #pairs = get_matching_pairs(x, y, features, stitch_idx, stitch_idx + 1, threshold = 0.4)
+    
+    
+        #h, w, _ = imgs[0].shape
+        #warped_pairs = feature_project(pairs, f, h, w)
+        #tx1, ty1 = ransac(warped_pairs, k = 100, threshold = 3)
+        tx, ty = shifts[stitch_idx]
+        print(tx, ty)
+        tx, ty = int(tx), int(ty)
+        global_tx += tx
+        global_ty += ty
+        #tx1, ty1 = int(tx1), int(ty1)
+        #tx0 = 0
+        #ty0 = 0
+        #shifts[stitch_idx] = (tx1, ty1)
+        #if( ty1 < 0 ):
+        #    ty0 = -ty1
+        #    ty1 = 0
+        #warped1 = translate(warped_imgs[stitch_idx], (0, 0))
+        #warped1 = warped_imgs[stitch_idx]
+        tx1, ty1 = global_tx, global_ty
+        warped1 = stitched_img
+        warped2 = translate(warped_imgs[stitch_idx+1], (tx1, ty1)) #後面是圖片要增加多少邊長，所以兩張圖片的y方向都要增加一樣的邊長
+        pad = (abs(ty1), 0) if ty1 < 0 else (0, abs(ty1))
+        warped1 = np.pad(warped1, (pad, (0,0),(0,0)), 'constant')
+        cv2.imwrite('warped1.jpg', warped1)
+        cv2.imwrite('warped2.jpg', warped2)
+    
+        h1, w1, _ = warped1.shape
+        h2, w2, _ = warped2.shape
+        assert(h1 == h2)
+        stitched_img = np.zeros((h1, w2, 3), dtype = np.float)
+        #print(w1, w2, tx1, warped_imgs[stitch_idx+1].shape[1])
+        stitched_img[:, :tx1, :] = warped1[:, :tx1, :]
+        stitched_img[:, w1:, :] = warped2[:, w1:, :]
+        ratio = np.arange(0, 1, 1.0 / (w1 - tx1))
+        ratio_map = np.repeat(ratio[np.newaxis, :], h1, axis = 0)
+        ratio_map = np.repeat(ratio_map[:, :, np.newaxis], 3, axis = 2)
+        #print(ratio_map.shape)
+        #print(ratio_map[:, :, 0])
+        #warped1[:, tx1:, :][np.where(warped1[:, tx1:, :] == 0)] = 255
+        #warped2[:, tx1:w1, :][np.where(warped2[:, tx1:w1, :] == 0)] = 255
+        stitched_img[:, tx1:w1, :] = (1 - ratio_map) * warped1[:, tx1:, :] + ratio_map * warped2[:, tx1:w1, :]
+    
+    
+        #h, w, _ = warped_imgs[stitch_idx].shape
+        #for j in range(h):
+        #    for i in range(w):
+        #        if in_img( f, tx0, ty0, w, h, i, j) and in_img( f, tx1, ty1, w, h, i, j):
+        #            boundary_width = 2*np.tan(w//2/f)*f
+        #            blank_width = (w-boundary_width)/2
+        #            boundary = w-blank_width
+        #            boundary_dis0 = boundary - i
+        #            ratio0 = boundary_dis0/(boundary_width-tx1)
+        #            ratio1 = 1-ratio0
+        #            warped2[j,i] = warped1[j,i]*ratio0 + warped2[j,i]*ratio1
+        #            # print(ratio0)
+        #        elif in_img( f, tx0, ty0, w, h, i, j):
+        #            warped2[j,i] = warped1[j,i]
+    
+        cv2.imwrite('test{}_new.jpg'.format(stitch_idx), stitched_img)
+    pickle.dump(shifts, open('shift.pickle', 'wb'))
+    
