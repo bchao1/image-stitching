@@ -49,19 +49,22 @@ def feature_project(features, f, h, w):
     return new_feature_pairs
 
 
-def get_warped_images(run):
+def get_warped_images(run, f, ratio, use_cache = True):
     image_dir = os.path.join('runs', run, 'images')
     warped_dir = os.path.join('runs', run, 'warped')
     image_files = sorted(os.listdir(image_dir), key = lambda x: int(x.split('.')[0]))
     image_paths = [os.path.join(image_dir, f) for f in image_files]
     
+    if os.path.exists(warped_dir) and use_cache:
+        print("Using cached warped images ...")
+        return [cv2.imread(os.path.join(warped_dir, '{}.jpg'.format(i))) for i in range(len(image_paths))]
     if not os.path.exists(warped_dir):
         os.mkdir(warped_dir)
-    else:
-        return [cv2.imread(os.path.join(warped_dir, '{}.jpg'.format(i))) for i in range(len(image_paths))]
     imgs = [transform.rescale(cv2.imread(impath), 1.0 / ratio, multichannel = True) for impath in image_paths]
     warped_imgs = [project(img, f) for img in imgs]
+    print("Warping images ...")
     for i, img in enumerate(warped_imgs):
+        print("Saving warped image ", i)
         cv2.imwrite(os.path.join(warped_dir, '{}.jpg'.format(i)), img)
     return warped_imgs
     

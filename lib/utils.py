@@ -2,8 +2,8 @@ import cv2
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from .features.detection import harris_corner_detection
-from .features.matching import least_error_ratio_match
+from features.detection import harris_corner_detection
+from features.matching import least_error_ratio_match
 
 def read_image(img_path, downscale):
     img = cv2.imread(img_path)[:,:,::-1]
@@ -20,6 +20,9 @@ def plot_detection(x, y, img_file, corner_response):
     ax[0].imshow(corner_response, cmap = 'gray')
     ax[1].imshow(colored_img)
     ax[1].scatter(x, y, marker = '+', color = 'red')
+    for i in range(2):
+        ax[i].axes.get_xaxis().set_visible(False)
+        ax[i].axes.get_yaxis().set_visible(False)
     plt.tight_layout()
     plt.show()
 
@@ -27,9 +30,9 @@ def test_detection(img_path, downscale = 4):
     x, y, r, f = harris_corner_detection(img_path, downscale, r_threshold = 1e8, max_features = 100, window = 3)
     plot_detection(x, y, img_path, r)
 
-def plot_matching(run, save = False):
+def plot_matching(run, start, end, save = False):
     img_dir = os.path.join('runs', run, 'images')
-    img_files = sorted(os.listdir(img_dir), key = lambda x: int(x.split('.')[0]))
+    img_files = sorted(os.listdir(img_dir), key = lambda x: int(x.split('.')[0]))[start:end+1]
     print(img_files)
     img_paths = [os.path.join(img_dir, f) for f in img_files]
     detection_dir = os.path.join('runs', run, 'detection')
@@ -57,7 +60,28 @@ def plot_matching(run, save = False):
 
     plt.subplots_adjust(left=0.01, bottom=0, right=0.99, top=1)
     if save:
-        plt.savefig(os.path.join('runs', run, 'matching.png'))
+        plt.savefig(os.path.join('runs', run, 'matching_{}_{}.png'.format(start, end)))
+    plt.show()
+
+def plot_compare(img_file):
+    x1, y1, corner_response1, _ = harris_corner_detection(img_file, 4, max_features = 100, non_maximal_suppression = False)
+    x2, y2, corner_response2, _ = harris_corner_detection(img_file, 4, max_features = 100, non_maximal_suppression = True)
+
+    colored_img = cv2.imread(img_file)[:,:,::-1]
+    h, w = corner_response1.shape
+    colored_img = cv2.resize(colored_img, (w, h), interpolation = cv2.INTER_CUBIC)
+
+    f, ax = plt.subplots(1, 2)
+    ax[0].imshow(colored_img)
+    ax[0].scatter(x1, y1, marker = '.', color = 'red')
+    ax[0].set_title("Without suppression")
+    ax[1].imshow(colored_img)
+    ax[1].scatter(x2, y2, marker = '.', color = 'red')
+    ax[1].set_title("With suppression")
+    for i in range(2):
+        ax[i].axes.get_xaxis().set_visible(False)
+        ax[i].axes.get_yaxis().set_visible(False)
+    plt.tight_layout()
     plt.show()
 
 def get_image_size(run):
@@ -67,3 +91,7 @@ def get_image_size(run):
     img = cv2.imread(img_path)
     h, w, _ = img.shape
     return h, w
+
+if __name__ == '__main__':
+    img_file = '../runs/lib1/images/1.JPG'
+    test_detection(img_file)
