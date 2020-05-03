@@ -59,7 +59,7 @@ def get_warped_images(run):
         os.mkdir(warped_dir)
     else:
         return [cv2.imread(os.path.join(warped_dir, '{}.jpg'.format(i))) for i in range(len(image_paths))]
-    imgs = [rescale(cv2.imread(impath), 1.0 / ratio, multichannel = True) for impath in image_paths]
+    imgs = [transform.rescale(cv2.imread(impath), 1.0 / ratio, multichannel = True) for impath in image_paths]
     warped_imgs = [project(img, f) for img in imgs]
     for i, img in enumerate(warped_imgs):
         cv2.imwrite(os.path.join(warped_dir, '{}.jpg'.format(i)), img)

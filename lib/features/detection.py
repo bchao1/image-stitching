@@ -59,7 +59,7 @@ def get_feature_discriptors(img, x_coors, y_coors, w):
 def harris_corner_detection(img_file, downscale, r_threshold = 1e8, max_features = 500, window = 20):
     img = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
     h, w = img.shape
-    img = cv2.resize(img, (w // downscale, h // downscale), interpolation = cv2.INTER_CUBIC)
+    img = cv2.resize(img, (w // int(downscale), h // int(downscale)), interpolation = cv2.INTER_CUBIC)
     print("Image size: {}".format(img.shape))
 
     I_x = convolve2d(img, sobel_filter('x'), boundary = 'symm', mode = 'same')
