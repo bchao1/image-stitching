@@ -1,6 +1,5 @@
 from argparse import ArgumentParser
-from lib.features.detection import get_features
-from lib.stitch import stitch_images, get_pairwise_alignments
+from lib.stitch import stitch_images
 
 def configs():
     parser = ArgumentParser()
