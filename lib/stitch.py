@@ -44,14 +44,15 @@ def get_pairwise_alignments(run, f, ratio, use_cache = True):
     cache_file = os.path.join(run_dir, 'shift.pickle')
 
     if use_cache and os.path.exists(cache_file):
+        print("Use cached pairwise alignments ...")
         return pickle.load(open(os.path.join(run_dir, 'shift.pickle'), 'rb'))
     
     shifts = {}
     h, w = get_image_size(run)
-    f //= ratio
     h //= ratio
     w //= ratio
     print(h, w)
+    print("Compute pairwise alignments ...")
     for stitch_idx in range(len(features) - 1):
         print('Computing pairwise aligments for', stitch_idx, stitch_idx + 1)
         pairs = get_matching_pairs(x, y, features, stitch_idx, stitch_idx + 1, threshold = 0.4)
@@ -64,8 +65,9 @@ def get_pairwise_alignments(run, f, ratio, use_cache = True):
     return shifts
 
 def stitch_images(run, f, ratio, use_cache):
+    f //= ratio
     run_dir = os.path.join('runs', run)
-    warped_imgs = get_warped_images(run)
+    warped_imgs = get_warped_images(run, f, ratio, use_cache)
     shifts = get_pairwise_alignments(run, f, ratio, use_cache)
     
     dy = [shifts[k][1] for k in sorted(shifts.keys())]
@@ -85,7 +87,7 @@ def stitch_images(run, f, ratio, use_cache):
     stitched_img = np.pad(stitched_img, ((0, max_dy - dy[0]), (0, 0), (0, 0)), mode = 'edge')
 
     for i in range(0, len(warped_imgs) - 1):
-        print('stiching images', i, i + 1)
+        print('Stiching images', i, i + 1)
 
         dx = shifts[i][0]
         global_dx += dx

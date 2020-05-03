@@ -56,7 +56,7 @@ def get_feature_discriptors(img, x_coors, y_coors, w):
         features[i] = patch
     return features
 
-def harris_corner_detection(img_file, downscale, r_threshold = 1e8, max_features = 500, window = 20):
+def harris_corner_detection(img_file, downscale, r_threshold = 1e8, max_features = 500, window = 20, non_maximal_suppression = True):
     img = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
     h, w = img.shape
     img = cv2.resize(img, (w // downscale, h // downscale), interpolation = cv2.INTER_CUBIC)
@@ -81,11 +81,14 @@ def harris_corner_detection(img_file, downscale, r_threshold = 1e8, max_features
     corner_response = compute_corner_response(S_xx, S_xy, S_yy, k = 0.04)
     y, x = np.where(corner_response >= r_threshold)
     valid_response = corner_response[y, x] # those over threshold
-    print(valid_response.shape)
+    #print(valid_response.shape)
 
     sorted_indices = (-valid_response).argsort() # sort indices by response value
-    suppresion_radius = adaptive_non_maximal_suppresion(sorted_indices, valid_response, x, y)
-    final_indices = (-suppresion_radius).argsort()[:max_features]
+    if non_maximal_suppression:
+        suppresion_radius = adaptive_non_maximal_suppresion(sorted_indices, valid_response, x, y)
+        final_indices = (-suppresion_radius).argsort()[:max_features]
+    else:
+        final_indices = sorted_indices[:max_features]
     y, x = y[final_indices], x[final_indices]
 
     features = get_feature_discriptors(img, x, y, w = window)
@@ -95,6 +98,7 @@ def get_features(run, downscale, r_threshold = 1e8, max_features = 500, window =
     img_dir = os.path.join('runs', run, 'images')
     detection_dir = os.path.join('runs', run, 'detection')
     if os.path.exists(detection_dir) and use_cache:
+        print("Use cached features ...")
         x_coors = np.load(os.path.join(detection_dir, 'x.npy'))
         y_coors = np.load(os.path.join(detection_dir, 'y.npy'))
         features = np.load(os.path.join(detection_dir, 'features.npy'))
@@ -108,7 +112,7 @@ def get_features(run, downscale, r_threshold = 1e8, max_features = 500, window =
     features = np.zeros((len(img_paths), max_features, 8 ** 2)) # 8 * 8 features
     x_coors = np.zeros((len(img_paths), max_features))
     y_coors = np.zeros((len(img_paths), max_features))
-
+    print("Getting features ...")
     for i, img in enumerate(img_paths):
         print("Detecting {} features ...".format(img))
         x, y, _, f = harris_corner_detection(img, downscale, r_threshold = r_threshold,
@@ -120,8 +124,3 @@ def get_features(run, downscale, r_threshold = 1e8, max_features = 500, window =
     np.save(os.path.join(detection_dir, 'y.npy'), y_coors)
     np.save(os.path.join(detection_dir, 'features.npy'), features)
     return x_coors, y_coors, features
-
-if __name__ == '__main__':
-    img_file = '../../images.jpg'
-    x, y, corner_response, features = harris_corner_detection(img_file)
-    plot_detection(x, y, img_file, corner_response)
