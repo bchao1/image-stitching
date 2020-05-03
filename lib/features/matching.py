@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
+from .detection import get_features
 
 def get_matching_pairs(x, y, features, i, j, threshold = 0.5):
     pi, pj = least_error_ratio_match(features[i], features[j], threshold)

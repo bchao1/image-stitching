@@ -1,4 +1,5 @@
 import cv2
+import os
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.signal import convolve2d
@@ -55,7 +56,7 @@ def get_feature_discriptors(img, x_coors, y_coors, w):
         features[i] = patch
     return features
 
-def harris_corner_detection(img_file, downscale = 1, r_threshold = 1e7, max_features = 500, window = 20):
+def harris_corner_detection(img_file, downscale, r_threshold = 1e8, max_features = 500, window = 20):
     img = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
     h, w = img.shape
     img = cv2.resize(img, (w // downscale, h // downscale), interpolation = cv2.INTER_CUBIC)
@@ -90,16 +91,35 @@ def harris_corner_detection(img_file, downscale = 1, r_threshold = 1e7, max_feat
     features = get_feature_discriptors(img, x, y, w = window)
     return x, y, corner_response, features
 
-def plot_detection(x, y, img_file, corner_response):
-    colored_img = cv2.imread(img_file)[:,:,::-1]
-    h, w = corner_response.shape
-    colored_img = cv2.resize(colored_img, (w, h), interpolation = cv2.INTER_CUBIC)
+def get_features(run, downscale, r_threshold = 1e8, max_features = 500, window = 20, use_cache = True):
+    img_dir = os.path.join('runs', run, 'images')
+    detection_dir = os.path.join('runs', run, 'detection')
+    if os.path.exists(detection_dir) and use_cache:
+        x_coors = np.load(os.path.join(detection_dir, 'x.npy'))
+        y_coors = np.load(os.path.join(detection_dir, 'y.npy'))
+        features = np.load(os.path.join(detection_dir, 'features.npy'))
+        return x_coors, y_coors, features
+    if not os.path.exists(detection_dir):
+        os.mkdir(detection_dir)
+    
+    img_files = sorted(os.listdir(img_dir), key = lambda x: int(x.split('.')[0]))
+    img_paths = [os.path.join(img_dir, f) for f in img_files]
 
-    f, ax = plt.subplots(1, 2)
-    ax[0].imshow(corner_response, cmap = 'gray')
-    ax[1].imshow(colored_img)
-    ax[1].scatter(x, y, marker = '+', color = 'red')
-    plt.show()
+    features = np.zeros((len(img_paths), max_features, 8 ** 2)) # 8 * 8 features
+    x_coors = np.zeros((len(img_paths), max_features))
+    y_coors = np.zeros((len(img_paths), max_features))
+
+    for i, img in enumerate(img_paths):
+        print("Detecting {} features ...".format(img))
+        x, y, _, f = harris_corner_detection(img, downscale, r_threshold = r_threshold,
+            max_features = max_features, window = window)
+        x_coors[i] = x
+        y_coors[i] = y 
+        features[i] = f
+    np.save(os.path.join(detection_dir, 'x.npy'), x_coors)
+    np.save(os.path.join(detection_dir, 'y.npy'), y_coors)
+    np.save(os.path.join(detection_dir, 'features.npy'), features)
+    return x_coors, y_coors, features
 
 if __name__ == '__main__':
     img_file = '../../images.jpg'
