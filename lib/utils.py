@@ -2,8 +2,8 @@ import cv2
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from features.detection import harris_corner_detection
-from features.matching import least_error_ratio_match
+from .features.detection import harris_corner_detection
+from .features.matching import least_error_ratio_match
 
 def read_image(img_path, downscale):
     img = cv2.imread(img_path)[:,:,::-1]
