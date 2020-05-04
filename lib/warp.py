@@ -7,16 +7,18 @@ import os
 
 def project(img, f):
     h,w,_ = img.shape
+    boundary_width = 2*np.arctan(w//2/f)*f
+    blank_width = (w-boundary_width)/2
     def callback(xy_d):
-        x_d = (xy_d[:, 0]) - w // 2
-        y_d = (xy_d[:, 1]) - h // 2
+        x_d = (xy_d[:, 0]) - w // 2 +blank_width
+        y_d = (xy_d[:, 1]) - h // 2 
 
         x_u = np.tan(x_d / f) * f
         y_u = y_d * np.sqrt(x_d**2 + f**2) / f
         xy_u = np.column_stack((x_u + w // 2, y_u + h // 2))
         return xy_u
 
-    out = transform.warp(img, callback, order = 1, mode = 'edge')
+    out = transform.warp(img, callback, order = 1, mode = 'edge', output_shape=(math.ceil(h), math.ceil(boundary_width)))
     return (out * 255).astype(np.uint8)
 
 def translate(img, tx, ty):

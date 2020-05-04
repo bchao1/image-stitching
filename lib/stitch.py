@@ -67,50 +67,44 @@ def get_pairwise_alignments(run, f, ratio, use_cache = True):
 def stitch_images(run, f, ratio, use_cache):
     f //= ratio
     run_dir = os.path.join('runs', run)
-    warped_imgs = get_warped_images(run, f, ratio, use_cache)
     shifts = get_pairwise_alignments(run, f, ratio, use_cache)
     
-    dy = [shifts[k][1] for k in sorted(shifts.keys())]
+    dy = np.add.accumulate([0]+[shifts[k][1] for k in sorted(shifts.keys())])
+    dx = np.add.accumulate([0]+[shifts[k][0] for k in sorted(shifts.keys())])
+    dx_dec, dx_int = np.modf(dx)
 
-    for i in range(1, len(dy)): # compute global y shift for each image
-        dy[i] += dy[i - 1]
-    dy.insert(0, 0)
+    warped_imgs = get_warped_images(run, f, ratio, use_cache)
+    warped_imgs = [translate(img, tx, ty) for img, tx, ty in zip(warped_imgs, dx_dec, dy)]
 
     min_dy, max_dy = min(dy), max(dy)
 
     if min_dy < 0: # normalize to make sure all dy shifts are positive
-        dy = [y - min_dy for y in dy]
+        dy -= min_dy
     assert all([y >= 0 for y in dy])
     
-    global_dx = 0
-    stitched_img = translate(warped_imgs[0], global_dx, dy[0])
-    stitched_img = np.pad(stitched_img, ((0, max_dy - dy[0]), (0, 0), (0, 0)), mode = 'edge')
-
-    for i in range(0, len(warped_imgs) - 1):
-        print('Stitching images', i, i + 1)
-
-        dx = shifts[i][0]
-        global_dx += dx
-
-        # Stitch warped1, warped2
-        warped1 = stitched_img
-        warped2 = translate(warped_imgs[i + 1], global_dx, dy[i + 1])
-        warped2 = np.pad(warped2, ((0, max_dy - dy[i + 1]), (0, 0), (0, 0)), mode = 'edge')
-
-        h1, w1, _ = warped1.shape
-        h2, w2, _ = warped2.shape
-        assert(h1 == h2)
-
-        stitched_img = np.zeros((h1, w2, 3), dtype = np.float) # container for stitched image
-        stitched_img[:, :global_dx, :] = warped1[:, :global_dx, :] # left part of image
-        stitched_img[:, w1:, :] = warped2[:, w1:, :] # right part of image
-        ratio = np.arange(0, 1, 1.0 / (w1 - global_dx)) # blending alpha
+    N = len(warped_imgs) # num of images
+    global_dx = dx[N-1]
+    stitched_img = translate(warped_imgs[N-1], global_dx, dy[N-1])
+    stitched_img = np.pad(stitched_img, ((0, max_dy - dy[N-1]), (0, 0), (0, 0)), mode = 'edge')
+    for i in range(N-2, -1,-1):                     #----------dx2-----------v
+        print('Stitching images', i, 'into', N-1)   #           ____----------____----------____
+                                                    #           |            |   |             |
+        dx1 = dx_int[i]                             #           |            |   |             |
+        dx2 = dx_int[i+1]                           #           |            |   |             |
+        # Stitch stitched_img, warped_imgs[i]       #           |            |   |             |
+                                                    #           |            |   |             |
+        h1, w1, _ = stitched_img.shape              #           |            |   |             |
+        h2, w2, _ = warped_imgs[i].shape            #           |            |   |             |
+        assert(h1 >= h2)                            #           ----__________----__________----
+                                                    #-----dx1---^         
+           
+        stitched_img[:h2, dx1:dx2, :] = warped_imgs[i][:, :dx2-dx1, :] # left part of image
+        ratio = np.arange(0, 1, 1.0 / (w2 + dx1 - dx2)) # blending alpha
 
         # Make ratio to 3d
-        ratio_map = np.repeat(ratio[np.newaxis, :], h1, axis = 0)
-        ratio_map = np.repeat(ratio_map[:, :, np.newaxis], 3, axis = 2)
+        ratio_map = np.repeat(ratio[:, np.newaxis], 3, axis = 1)
 
         # blend images
-        stitched_img[:, global_dx:w1, :] = (1 - ratio_map) * warped1[:, global_dx:, :] + ratio_map * warped2[:, global_dx:w1, :]
-    stitched_img = stitched_img[100:-100, 100:-100, :] # crop out edges
+        stitched_img[:h2, dx2:dx1+w2, :] = (1 - ratio_map) * stitched_img[:h2, dx2:dx1+w2, :] + ratio_map * warped_imgs[i][:, dx2-dx1:, :]
+    # stitched_img = stitched_img[100:-100, 100:-100, :] # crop out edges
     cv2.imwrite(os.path.join(run_dir, 'result.jpg'), stitched_img)
