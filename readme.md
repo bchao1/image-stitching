@@ -100,7 +100,10 @@ python3 main.py 4 5000 lib1 --use_cache
 
 ### Pairwise Alignment
 
-
+為了處理方便，以及我們拍攝時都有加裝腳架和以水平儀確認水平的情況，因此本次作業我們使用translation model進行image stitching。
+確定了warping的model之後，我們便可以利用RANSAC找出最好的translation model參數。由於translation model中的變數只有兩個，因此在RANSAC中，n=1。參考老師的投影片後，我將k設為100，以確保P的信心水準一定保持在99％以上。這裡inlier的定義：
+位移與被選到的feature pair位移相差不超過3的feature pair。
+進行完RANSAC後，為了確保得到的是一個對於所有的inlier較為均衡的位移量，因次另外對全部的inlier做了一次平均。
 
 ### Image Stitching and Blending
 
@@ -116,4 +119,4 @@ python3 main.py 4 5000 lib1 --use_cache
 
 我們知道全部照片的 y shift 以後，就可以將全部的照片按照自己的 dy 向下位移，並且再將每一個照片都 pad 到一樣高。這邊建議用 edge mode 的 padding，如果單純用黑色到時候 blending 會不好看。
 
-至於 x shift 會影響到 blending，作法一樣是從左往右處理，然後維護一個 global x shift，每次都多接合一個新的影像並在邊界處用投影片提到的基本 decreasing / increasing alpha blending 方法，最後就可以接合全部的影像。
+至於 x shift 會影響到 blending，作法是從右往左處理，然後維護一個 global x shift，每次都多接合一個新的影像並在邊界處用投影片提到的基本 decreasing / increasing alpha blending 方法，最後就可以接合全部的影像。

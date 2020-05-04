@@ -7,10 +7,8 @@ import os
 
 def project(img, f):
     h,w,_ = img.shape
-    boundary_width = 2*np.arctan(w//2/f)*f
-    blank_width = (w-boundary_width)/2
     def callback(xy_d):
-        x_d = (xy_d[:, 0]) - w // 2 +blank_width
+        x_d = (xy_d[:, 0]) - w // 2
         y_d = (xy_d[:, 1]) - h // 2 
 
         x_u = np.tan(x_d / f) * f
@@ -18,7 +16,7 @@ def project(img, f):
         xy_u = np.column_stack((x_u + w // 2, y_u + h // 2))
         return xy_u
 
-    out = transform.warp(img, callback, order = 1, mode = 'edge', output_shape=(math.ceil(h), math.ceil(boundary_width)))
+    out = transform.warp(img, callback, order = 3, mode = 'constant')
     return (out * 255).astype(np.uint8)
 
 def translate(img, tx, ty):
@@ -32,7 +30,7 @@ def translate(img, tx, ty):
         xy_u = np.column_stack((x_u, y_u))
         return xy_u
 
-    out = transform.warp(img, callback, order = 5, mode = 'edge', output_shape=(math.ceil(h+abs(ty)), math.ceil(w+abs(tx))))
+    out = transform.warp(img, callback, order = 3, mode = 'constant', output_shape=(math.ceil(h+abs(ty)), math.ceil(w+abs(tx))))
     return (out * 255).astype(np.uint8)
 
 def feature_project(features, f, h, w):
@@ -69,6 +67,20 @@ def get_warped_images(run, f, ratio, use_cache = True):
         print("Saving warped image ", i)
         cv2.imwrite(os.path.join(warped_dir, '{}.jpg'.format(i)), img)
     return warped_imgs
+
+def pre_crop(imgs, f):
+    h, w, _ = imgs[0].shape
+
+    x_top_right = w//2
+    y_top_right = h//2
+
+    x_top_right2 = math.ceil(f * np.arctan(x_top_right/f))
+    y_top_right2 = math.ceil(f * y_top_right /math.sqrt(x_top_right**2+f**2)) 
+
+    x_margin = x_top_right - x_top_right2
+    y_margin = y_top_right - y_top_right2
+    # print('pre_crop')
+    return [ img[y_margin:-y_margin, x_margin:-x_margin] for img in imgs ] 
     
 if __name__ == '__main__':
     img = cv2.imread('../images/')
