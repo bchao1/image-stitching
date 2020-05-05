@@ -87,7 +87,7 @@ def stitch_images(run, f, ratio, use_cache):
     N = len(warped_imgs) # num of images
     stitched_img = np.pad(warped_imgs[N-1], ((0, math.ceil(max_dy - dy[N-1])), (dx_int[N-1], 0), (0, 0)), mode = 'constant')
     for i in range(N-2, -1,-1):    
-                                                    
+        print('stitching image',i)                                            
         dx1 = dx_int[i]                             
         dx2 = dx_int[i+1]                           
         # Stitch stitched_img, warped_imgs[i]       
